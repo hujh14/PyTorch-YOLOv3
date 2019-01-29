@@ -16,6 +16,24 @@ from skimage.transform import resize
 
 import sys
 
+def prepare_image(img, target_shape):
+    h, w, _ = img.shape
+    dim_diff = np.abs(h - w)
+    # Upper (left) and lower (right) padding
+    pad1, pad2 = dim_diff // 2, dim_diff - dim_diff // 2
+    # Determine padding
+    pad = ((pad1, pad2), (0, 0), (0, 0)) if h <= w else ((0, 0), (pad1, pad2), (0, 0))
+    # Add padding
+    input_img = np.pad(img, pad, 'constant', constant_values=127.5) / 255.
+    # Resize and normalize
+    input_img = resize(input_img, (target_shape[0], target_shape[1], 3), mode='reflect')
+    # Channels-first
+    input_img = np.transpose(input_img, (2, 0, 1))
+    # As pytorch tensor
+    input_img = torch.from_numpy(input_img).float()
+    return input_img
+
+
 class ImageFolder(Dataset):
     def __init__(self, folder_path, img_size=416):
         self.files = sorted(glob.glob('%s/*.*' % folder_path))
@@ -25,20 +43,7 @@ class ImageFolder(Dataset):
         img_path = self.files[index % len(self.files)]
         # Extract image
         img = np.array(Image.open(img_path))
-        h, w, _ = img.shape
-        dim_diff = np.abs(h - w)
-        # Upper (left) and lower (right) padding
-        pad1, pad2 = dim_diff // 2, dim_diff - dim_diff // 2
-        # Determine padding
-        pad = ((pad1, pad2), (0, 0), (0, 0)) if h <= w else ((0, 0), (pad1, pad2), (0, 0))
-        # Add padding
-        input_img = np.pad(img, pad, 'constant', constant_values=127.5) / 255.
-        # Resize and normalize
-        input_img = resize(input_img, (*self.img_shape, 3), mode='reflect')
-        # Channels-first
-        input_img = np.transpose(input_img, (2, 0, 1))
-        # As pytorch tensor
-        input_img = torch.from_numpy(input_img).float()
+        input_img = prepare_image(img, self.img_shape)
 
         return img_path, input_img
 
@@ -69,21 +74,7 @@ class ListDataset(Dataset):
             img_path = self.img_files[index % len(self.img_files)].rstrip()
             img = np.array(Image.open(img_path))
 
-        h, w, _ = img.shape
-        dim_diff = np.abs(h - w)
-        # Upper (left) and lower (right) padding
-        pad1, pad2 = dim_diff // 2, dim_diff - dim_diff // 2
-        # Determine padding
-        pad = ((pad1, pad2), (0, 0), (0, 0)) if h <= w else ((0, 0), (pad1, pad2), (0, 0))
-        # Add padding
-        input_img = np.pad(img, pad, 'constant', constant_values=128) / 255.
-        padded_h, padded_w, _ = input_img.shape
-        # Resize and normalize
-        input_img = resize(input_img, (*self.img_shape, 3), mode='reflect')
-        # Channels-first
-        input_img = np.transpose(input_img, (2, 0, 1))
-        # As pytorch tensor
-        input_img = torch.from_numpy(input_img).float()
+        input_img = prepare_image(img, self.img_shape)
 
         #---------
         #  Label
